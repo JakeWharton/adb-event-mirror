@@ -32,6 +32,8 @@ EVENT 0 0 0
  ⋮
 ```
 
+In order for the script to work you must have both `kotlin` and `adb` available on your shell path.
+
 
 # License
 
