@@ -18,6 +18,8 @@ emulator-5556	device
 
 $ adb -s emulator-5554 shell getevent | /path/to/adb-event-mirror.main.kts emulator-5556
 emulator-5556 using /dev/input/event1
+ready!
+
 EVENT 3 57 0
 EVENT 3 48 7
 EVENT 3 58 129
