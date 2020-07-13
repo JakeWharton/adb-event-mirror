@@ -16,7 +16,7 @@ List of devices attached
 emulator-5554	device
 emulator-5556	device
 
-$ adb -s emulator-5554 shell getevent | /path/to/adb-event-mirror.main.kts emulator-5556
+$ /path/to/adb-event-mirror.main.kts emulator-5554 emulator-5556
 emulator-5556 using /dev/input/event1
 ready!
 
@@ -33,19 +33,6 @@ EVENT 0 0 0
 ```
 
 In order for the script to work you must have both `kotlin` and `adb` available on your shell path.
-
-Since the script reads events from stdin, you can also record events and replay them later.
-
-```
-$ adb shell getevent > clear_recents.txt
-
-$ cat clear_recents.txt | /path/to/adb-event-mirror.main.kts emulator-5554
-emulator-5556 using /dev/input/event1
-ready!
-
-EVENT 3 57 0
- ⋮
-```
 
 
 # License
