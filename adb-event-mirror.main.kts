@@ -6,11 +6,14 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.multiple
 import com.github.ajalt.clikt.parameters.arguments.transformAll
+import com.github.ajalt.clikt.parameters.options.flag
+import com.github.ajalt.clikt.parameters.options.option
 import kotlin.concurrent.thread
 
 AdbEventMirrorCommand.main(args)
 
 object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
+	private val debug by option("--debug", help = "Enable debug logging").flag()
 	private val host by argument(name = "HOST_SERIAL")
 	private val mirrors by argument(name = "MIRROR_SERIAL")
 		.multiple(true)
@@ -19,7 +22,9 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 	override fun run() {
 		val devices = mirrors.map { serial ->
 			val device = findEventDevice(serial)
-			println("$serial using $device")
+			if (debug) {
+				println("$serial using $device")
+			}
 
 			createDevice(serial, device)
 		}
