@@ -14,6 +14,7 @@ AdbEventMirrorCommand.main(args)
 
 object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 	private val debug by option("--debug", help = "Enable debug logging").flag()
+	private val showTouches by option("--show-touches").flag("--hide-touches", default = true)
 	private val mirrors by argument(name = "MIRROR_SERIAL")
 		.multiple(true)
 		.transformAll { it.toSet() }
@@ -90,12 +91,35 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 	private fun createDevice(serial: String): Device {
 		val eventTypeToInput = parseEventTypeToInput(serial)
 
+		val showTouchesOriginalValue = ProcessBuilder()
+			.command("adb", "-s", serial, "shell", "settings get system show_touches")
+			.start()
+			.inputStream
+			.bufferedReader()
+			.readText()
+			.trim() == "1"
+
+		if (showTouches) {
+			ProcessBuilder()
+				.command("adb", "-s", serial, "shell", "settings put system show_touches 1")
+				.start()
+				.waitFor()
+		}
+
 		val process = ProcessBuilder()
 			.command("adb", "-s", serial, "shell")
 			.start()
 
 		Runtime.getRuntime().addShutdownHook(thread(start = false) {
 			process.destroy()
+
+			if (showTouches) {
+				val oldValue = if (showTouchesOriginalValue) "1" else "0"
+				ProcessBuilder()
+					.command("adb", "-s", serial, "shell", "settings put system show_touches $oldValue")
+					.start()
+					.waitFor()
+			}
 		})
 
 		val outputStream = process.outputStream
