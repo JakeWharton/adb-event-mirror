@@ -19,15 +19,15 @@ emulator-5556	device
 $ adb -s emulator-5554 shell getevent | /path/to/adb-event-mirror.main.kts emulator-5556
 ready!
 
-EVENT 3 57 0
-EVENT 3 48 7
-EVENT 3 58 129
-EVENT 3 53 25812
-EVENT 3 54 31666
-EVENT 0 0 0
-EVENT 3 58 0
-EVENT 3 57 4294967295
-EVENT 0 0 0
+EVENT /dev/input/event1 3 57 0
+EVENT /dev/input/event1 3 48 7
+EVENT /dev/input/event1 3 58 129
+EVENT /dev/input/event1 3 53 25812
+EVENT /dev/input/event1 3 54 31666
+EVENT /dev/input/event1 0 0 0
+EVENT /dev/input/event1 3 58 0
+EVENT /dev/input/event1 3 57 4294967295
+EVENT /dev/input/event1 0 0 0
  ⋮
 ```
 
@@ -41,7 +41,7 @@ $ adb shell getevent > clear_recents.txt
 $ cat clear_recents.txt | /path/to/adb-event-mirror.main.kts emulator-5554
 ready!
 
-EVENT 3 57 0
+EVENT /dev/input/event1 3 57 0
  ⋮
 ```
 
