@@ -2,9 +2,6 @@
 
 @file:DependsOn("com.github.ajalt:clikt:2.8.0")
 
-import Adb_event_mirror_main.AdbEventMirrorCommand.Device.Input
-import Adb_event_mirror_main.AdbEventMirrorCommand.Device.Input.Key
-import Adb_event_mirror_main.AdbEventMirrorCommand.Device.Input.Touch
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.multiple
@@ -17,34 +14,27 @@ AdbEventMirrorCommand.main(args)
 
 object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 	private val debug by option("--debug", help = "Enable debug logging").flag()
-	private val host by argument(name = "HOST_SERIAL")
 	private val mirrors by argument(name = "MIRROR_SERIAL")
 		.multiple(true)
 		.transformAll { it.toSet() }
 
 	override fun run() {
-		val hostInputs = findInputDevices(host).entries.associate { it.value to it.key }
-		val hostEvents = ProcessBuilder()
-			.command("adb", "-s", host, "shell", "getevent")
-			.start()
-
 		val mirrorDevices = mirrors.map(::createDevice)
 
 		println("ready!\n")
 
-		hostEvents.inputStream
+		System.`in`
 			.bufferedReader()
 			.lineSequence()
 			.onEach { line ->
 				if (debug) {
-					println("[$host] $line")
+					println("[host] $line")
 				}
 			}
 			.mapNotNull(eventLine::matchEntire)
 			.forEach { match ->
-				val (inputDevice, typeHex, codeHex, valueHex) = match.destructured
-				val input = hostInputs.getValue(inputDevice)
-				val type = typeHex.toLong(16)
+				val (input, typeHex, codeHex, valueHex) = match.destructured
+				val type = typeHex.toInt(16)
 				val code = codeHex.toLong(16)
 				val value = valueHex.toLong(16)
 
@@ -61,48 +51,44 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 		}
 	}
 
-	private fun findInputDevices(serial: String): Map<Input, String> {
+	private fun parseEventTypeToInput(serial: String): Map<Int, String> {
 		val eventDeviceProcess = ProcessBuilder()
 			.command("adb", "-s", serial, "shell", "getevent -pl")
 			.start()
 		val output = eventDeviceProcess.inputStream.bufferedReader().readText()
 
-		val inputDevices = mutableMapOf<Input, String>()
+		val inputs = mutableMapOf<Int, String>()
 		var lastDevice: String? = null
-		for (eventLine in output.lines()) {
-			if (eventLine.startsWith("add device ")) {
-				lastDevice = eventLine.substringAfter(": ")
-			} else if ("ABS_MT_TOUCH" in eventLine) {
-				val previous = inputDevices[Touch]
-				if (previous == null || lastDevice!! < previous) {
-					inputDevices[Touch] = lastDevice!!
+		for (line in output.lines()) {
+			addDeviceLine.matchEntire(line)?.let { match ->
+				lastDevice = match.groupValues[1]
+			}
+			eventTypeLine.matchEntire(line)?.let { match ->
+				if (lastDevice!!.endsWith("/event0")) {
+					// Ignore 'event0' as a quick hack. TODO actually map event codes too.
+					return@let
 				}
-			} else if ("KEY_ESC" in eventLine) {
-				val previous = inputDevices[Key]
+				val type = match.groupValues[1].toInt(16) // TODO is this actually hex here?
+				val previous = inputs[type]
 				if (previous == null || lastDevice!! < previous) {
-					inputDevices[Key] = lastDevice!!
+					inputs[type] = lastDevice!!
 				}
 			}
 		}
 
 		if (debug) {
-			println("[$serial] devices: $inputDevices")
+			println("[$serial] devices: $inputs")
 		}
-		if (inputDevices.size != 2) {
-			System.err.println(output)
-			throw IllegalStateException("Unable to find touch and key input devices for $serial")
-		}
-		return inputDevices
+		return inputs
 	}
 
 	private interface Device {
-		enum class Input { Touch, Key }
-		fun sendEvent(input: Input, type: Long, code: Long, value: Long)
+		fun sendEvent(hostInput: String, type: Int, code: Long, value: Long)
 		fun detach()
 	}
 
 	private fun createDevice(serial: String): Device {
-		val inputDevices = findInputDevices(serial)
+		val eventTypeToInput = parseEventTypeToInput(serial)
 
 		val process = ProcessBuilder()
 			.command("adb", "-s", serial, "shell")
@@ -124,9 +110,17 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 		sendCommand("su")
 
 		return object : Device {
-			override fun sendEvent(input: Input, type: Long, code: Long, value: Long) {
-				val inputDevice = inputDevices.getValue(input)
-				sendCommand("sendevent $inputDevice $type $code $value")
+			private val hostInputToSelfInput = mutableMapOf<String, String>()
+
+			override fun sendEvent(hostInput: String, type: Int, code: Long, value: Long) {
+				val input = hostInputToSelfInput.computeIfAbsent(hostInput) {
+					val result = eventTypeToInput.getValue(type)
+					if (debug) {
+						println("[$serial] $result will be used for host $it")
+					}
+					result
+				}
+				sendCommand("sendevent $input $type $code $value")
 			}
 
 			override fun detach() {
@@ -137,5 +131,7 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 		}
 	}
 
+	private val addDeviceLine = Regex("""add device \d+: (.+)""")
+	private val eventTypeLine = Regex("""    [A-Z]+ \((\d+)\): .*""")
 	private val eventLine = Regex("""(/dev/input/[^:]+): ([0-9a-f]+) ([0-9a-f]+) ([0-9a-f]+)""")
 }
