@@ -11,6 +11,7 @@ import kotlin.concurrent.thread
 AdbEventMirrorCommand.main(args)
 
 object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
+	private val host by argument(name = "HOST_SERIAL")
 	private val mirrors by argument(name = "MIRROR_SERIAL")
 		.multiple(true)
 		.transformAll { it.toSet() }
@@ -22,9 +23,15 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 
 			createDevice(serial, device)
 		}
+
+		val hostEvents = ProcessBuilder()
+			.command("adb", "-s", host, "shell", "getevent")
+			.start()
+
 		println("ready!\n")
 
-		System.`in`.bufferedReader()
+		hostEvents.inputStream
+			.bufferedReader()
 			.lineSequence()
 			.mapNotNull(eventLine::matchEntire)
 			.forEach { match ->
