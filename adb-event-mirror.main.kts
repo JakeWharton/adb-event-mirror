@@ -1,4 +1,4 @@
-#!/usr/bin/env kotlin
+#!/usr/bin/env -S kotlinc -script --
 
 @file:DependsOn("com.github.ajalt:clikt:2.8.0")
 
