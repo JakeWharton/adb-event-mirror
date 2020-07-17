@@ -1,6 +1,7 @@
 #!/usr/bin/env -S kotlinc -script --
 
 @file:DependsOn("com.github.ajalt:clikt:2.8.0")
+@file:DependsOn("junit:junit:4.13")
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.arguments.argument
@@ -8,9 +9,16 @@ import com.github.ajalt.clikt.parameters.arguments.multiple
 import com.github.ajalt.clikt.parameters.arguments.transformAll
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
+import org.junit.Assert.assertEquals
+import org.junit.Test
+import org.junit.runner.JUnitCore
 import kotlin.concurrent.thread
 
-AdbEventMirrorCommand.main(args)
+if (args.contentEquals(arrayOf("--test"))) {
+	JUnitCore.main(AdbEventMirrorTest::class.java.name.toString())
+} else {
+	AdbEventMirrorCommand.main(args)
+}
 
 object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 	private val debug by option("--debug", help = "Enable debug logging").flag()
@@ -52,12 +60,7 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 		}
 	}
 
-	private fun parseInputDevices(serial: String): Map<Int, String> {
-		val eventDeviceProcess = ProcessBuilder()
-			.command("adb", "-s", serial, "shell", "getevent -pl")
-			.start()
-		val output = eventDeviceProcess.inputStream.bufferedReader().readText()
-
+	fun parseInputDevices(output: String): Map<Int, String> {
 		val inputDevices = mutableMapOf<Int, String>()
 		var lastInputDevice: String? = null
 		for (line in output.lines()) {
@@ -77,9 +80,6 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 			}
 		}
 
-		if (debug) {
-			println("[$serial] devices: $inputDevices")
-		}
 		return inputDevices
 	}
 
@@ -89,7 +89,16 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 	}
 
 	private fun createConnection(serial: String): DeviceConnection {
-		val inputDevices = parseInputDevices(serial)
+		val inputDevicesOutput = ProcessBuilder()
+			.command("adb", "-s", serial, "shell", "getevent -pl")
+			.start()
+			.inputStream
+			.bufferedReader()
+			.readText()
+		val inputDevices = parseInputDevices(inputDevicesOutput)
+		if (debug) {
+			println("[$serial] devices: $inputDevices")
+		}
 
 		val showTouchesOriginalValue = ProcessBuilder()
 			.command("adb", "-s", serial, "shell", "settings get system show_touches")
@@ -158,4 +167,60 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 	private val addDeviceLine = Regex("""add device \d+: (.+)""")
 	private val eventTypeLine = Regex("""    [A-Z]+ \((\d+)\): .*""")
 	private val eventLine = Regex("""(/dev/input/[^:]+): ([0-9a-f]+) ([0-9a-f]+) ([0-9a-f]+)""")
+}
+
+class AdbEventMirrorTest {
+	@Test fun hello() {
+		val actual = AdbEventMirrorCommand.parseInputDevices("""
+			|add device 1: /dev/input/event10
+			|    ABS (0003): 0000  : value 0, min 0, max 32767, fuzz 0, flat 0, resolution 0
+			|    SW  (0005): 0000
+			|add device 2: /dev/input/event0
+			|    KEY (0001): 0074
+			|add device 3: /dev/input/event8
+			|    ABS (0003): 0000  : value 0, min 0, max 32767, fuzz 0, flat 0, resolution 0
+			|    SW  (0005): 0000
+			|add device 4: /dev/input/event11
+			|    ABS (0003): 0000  : value 0, min 0, max 32767, fuzz 0, flat 0, resolution 0
+			|    SW  (0005): 0000
+			|add device 5: /dev/input/event5
+			|    ABS (0003): 0000  : value 0, min 0, max 32767, fuzz 0, flat 0, resolution 0
+			|    SW  (0005): 0000
+			|add device 6: /dev/input/event2
+			|    ABS (0003): 0000  : value 0, min 0, max 32767, fuzz 0, flat 0, resolution 0
+			|    SW  (0005): 0000
+			|add device 7: /dev/input/event12
+			|    ABS (0003): 0000  : value 0, min 0, max 32767, fuzz 0, flat 0, resolution 0
+			|    SW  (0005): 0000
+			|add device 8: /dev/input/event13
+			|    KEY (0001): 0001  0002  0003  0004  0005  0006  0007  0008
+			|    LED (0011): 0000  0001  0002
+			|add device 9: /dev/input/event6
+			|    ABS (0003): 0000  : value 0, min 0, max 32767, fuzz 0, flat 0, resolution 0
+			|    SW  (0005): 0000
+			|add device 10: /dev/input/event3
+			|    ABS (0003): 0000  : value 0, min 0, max 32767, fuzz 0, flat 0, resolution 0
+			|    SW  (0005): 0000
+			|add device 11: /dev/input/event1
+			|    KEY (0001): 0001  0002  0003  0004  0005  0006  0007  0008
+			|    MSC (0004): 0004
+			|    LED (0011): 0000  0001  0002
+			|add device 12: /dev/input/event7
+			|    ABS (0003): 0000  : value 0, min 0, max 32767, fuzz 0, flat 0, resolution 0
+			|    SW  (0005): 0000
+			|add device 13: /dev/input/event4
+			|    ABS (0003): 0000  : value 0, min 0, max 32767, fuzz 0, flat 0, resolution 0
+			|    SW  (0005): 0000
+			|add device 14: /dev/input/event9
+			|    ABS (0003): 0000  : value 0, min 0, max 32767, fuzz 0, flat 0, resolution 0
+			|    SW  (0005): 0000
+			|""".trimMargin())
+		val expected = mapOf(
+			1 to "/dev/input/event1",
+			3 to "/dev/input/event10",
+			4 to "/dev/input/event1",
+			17 to "/dev/input/event1"
+		)
+		assertEquals(expected, actual)
+	}
 }
