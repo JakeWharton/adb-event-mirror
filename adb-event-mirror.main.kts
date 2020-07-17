@@ -61,6 +61,12 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 	}
 
 	fun parseInputDevices(output: String): Map<Int, String> {
+		fun isDeviceNumberLower(old: String, new: String): Boolean {
+			val oldNumber = old.substringAfter("/event").toInt()
+			val newNumber = new.substringAfter("/event").toInt()
+			return newNumber < oldNumber
+		}
+
 		val inputDevices = mutableMapOf<Int, String>()
 		var lastInputDevice: String? = null
 		for (line in output.lines()) {
@@ -74,7 +80,7 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 				}
 				val type = match.groupValues[1].toInt(16) // TODO is this actually hex here?
 				val previous = inputDevices[type]
-				if (previous == null || lastInputDevice!! < previous) {
+				if (previous == null || isDeviceNumberLower(previous, lastInputDevice!!)) {
 					inputDevices[type] = lastInputDevice!!
 				}
 			}
@@ -217,7 +223,7 @@ class AdbEventMirrorTest {
 			|""".trimMargin())
 		val expected = mapOf(
 			1 to "/dev/input/event1",
-			3 to "/dev/input/event10",
+			3 to "/dev/input/event2",
 			4 to "/dev/input/event1",
 			17 to "/dev/input/event1"
 		)
