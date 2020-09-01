@@ -46,6 +46,22 @@ EVENT /dev/input/event1 3 57 0
 ```
 
 
+## Install
+
+**Mac OS**
+
+```
+$ brew install JakeWharton/repo/adb-event-mirror
+```
+
+**Other**
+
+Download `adb-event-mirror-main.kts` from
+[latest release](https://github.com/JakeWharton/adb-event-mirror/releases/latest).
+On MacOS, Linux, and Windows Linux subsystem you can `chmod +x` and execute the file directly.
+On regular Windows run `kotlin adb-event-mirror.main.kts`.
+
+
 # License
 
     Copyright 2020 Jake Wharton
