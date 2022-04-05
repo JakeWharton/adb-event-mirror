@@ -80,7 +80,6 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 			}
 			nameLine.matchEntire(line)?.let { match ->
 				val name = match.groupValues[1].split("\"")[1] // Ignoring the " at the start and end
-				println("name: $lastInputDevice , $name")
 				inputDevices.put(lastInputDevice!!, name)
 			}
 		}
