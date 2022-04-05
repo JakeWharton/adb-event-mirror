@@ -23,12 +23,15 @@ if (args.contentEquals(arrayOf("--test"))) {
 object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 	private val debug by option("--debug", help = "Enable debug logging").flag()
 	private val showTouches by option("--show-touches").flag("--hide-touches", default = true)
-	private val mirrorSerials by argument(name = "MIRROR_SERIAL")
+	private val deviceSerials by argument(name = "DEVICE_SERIALS")
 		.multiple(true)
 		.transformAll { it.toSet() }
 
 	override fun run() {
-		val mirrors = mirrorSerials.map(::createConnection)
+		if(deviceSerials.size < 2) {
+			throw Throwable("Please pass at least 2 device serials. For example, HostSerial MirrorSerial [AnotherMirrorSerial]...")
+		}
+		val host = deviceSerials.first()
 
 		println("ready!\n")
 
