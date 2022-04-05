@@ -78,16 +78,6 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 			addDeviceLine.matchEntire(line)?.let { match ->
 				lastInputDevice = match.groupValues[1]
 			}
-			eventTypeLine.matchEntire(line)?.let { match ->
-				if (lastInputDevice!!.endsWith("/event0")) {
-					// Ignore 'event0' as a quick hack. TODO actually map event codes too.
-					return@let
-				}
-				val type = match.groupValues[1].toInt(16) // TODO is this actually hex here?
-				val previous = inputDevices[type]
-				if (previous == null || isDeviceNumberLower(previous, lastInputDevice!!)) {
-					inputDevices[type] = lastInputDevice!!
-				}
 			nameLine.matchEntire(line)?.let { match ->
 				val name = match.groupValues[1].split("\"")[1] // Ignoring the " at the start and end
 				println("name: $lastInputDevice , $name")
@@ -184,7 +174,6 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 	}
 
 	private val addDeviceLine = Regex("""add device \d+: (.+)""")
-	private val eventTypeLine = Regex("""    [A-Z]+ \((\d+)\): .*""")
 	private val nameLine = Regex(""" *name:(.+)""")
 	private val eventLine = Regex("""(/dev/input/[^:]+): ([0-9a-f]+) ([0-9a-f]+) ([0-9a-f]+)""")
 }
