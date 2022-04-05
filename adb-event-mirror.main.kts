@@ -56,7 +56,7 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 					println("EVENT $input $type $code $value")
 				}
 				for (mirror in mirrors) {
-					mirror.sendEvent(input, type, code, value)
+					mirror.sendEvent(hostMapping[input] ?: input, type, code, value)
 				}
 			}
 
@@ -156,7 +156,7 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 
 			override fun sendEvent(hostInputDevice: String, type: Int, code: Long, value: Long) {
 				val inputDevice = hostInputToSelfInput.computeIfAbsent(hostInputDevice) {
-					val result = inputDevices.getValue(type)
+					val result = inputDevices.filter { it.value == hostInputDevice }.keys.first()
 					if (debug) {
 						println("[$serial] $result will be used for host $it")
 					}
