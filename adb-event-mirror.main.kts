@@ -32,6 +32,8 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 			throw Throwable("Please pass at least 2 device serials. For example, HostSerial MirrorSerial [AnotherMirrorSerial]...")
 		}
 		val host = deviceSerials.first()
+		val hostMapping = createDeviceEventMapping(host)
+		val mirrors = deviceSerials.minus(host).map(::createConnection)
 
 		println("ready!\n")
 
@@ -63,14 +65,14 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 		}
 	}
 
-	fun parseInputDevices(output: String): Map<Int, String> {
+	fun parseInputDevices(output: String): Map<String, String> {
 		fun isDeviceNumberLower(old: String, new: String): Boolean {
 			val oldNumber = old.substringAfter("/event").toInt()
 			val newNumber = new.substringAfter("/event").toInt()
 			return newNumber < oldNumber
 		}
 
-		val inputDevices = mutableMapOf<Int, String>()
+		val inputDevices = mutableMapOf<String, String>()
 		var lastInputDevice: String? = null
 		for (line in output.lines()) {
 			addDeviceLine.matchEntire(line)?.let { match ->
@@ -86,9 +88,12 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 				if (previous == null || isDeviceNumberLower(previous, lastInputDevice!!)) {
 					inputDevices[type] = lastInputDevice!!
 				}
+			nameLine.matchEntire(line)?.let { match ->
+				val name = match.groupValues[1].split("\"")[1] // Ignoring the " at the start and end
+				println("name: $lastInputDevice , $name")
+				inputDevices.put(lastInputDevice!!, name)
 			}
 		}
-
 		return inputDevices
 	}
 
@@ -97,7 +102,7 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 		fun detach()
 	}
 
-	private fun createConnection(serial: String): DeviceConnection {
+	private fun createDeviceEventMapping(serial: String): Map<String, String> {
 		val inputDevicesOutput = ProcessBuilder()
 			.command("adb", "-s", serial, "shell", "getevent -pl")
 			.start()
@@ -108,6 +113,11 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 		if (debug) {
 			println("[$serial] devices: $inputDevices")
 		}
+		return inputDevices
+	}
+
+	private fun createConnection(serial: String): DeviceConnection {
+		val inputDevices = createDeviceEventMapping(serial)
 
 		val showTouchesOriginalValue = ProcessBuilder()
 			.command("adb", "-s", serial, "shell", "settings get system show_touches")
@@ -175,6 +185,7 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 
 	private val addDeviceLine = Regex("""add device \d+: (.+)""")
 	private val eventTypeLine = Regex("""    [A-Z]+ \((\d+)\): .*""")
+	private val nameLine = Regex(""" *name:(.+)""")
 	private val eventLine = Regex("""(/dev/input/[^:]+): ([0-9a-f]+) ([0-9a-f]+) ([0-9a-f]+)""")
 }
 
