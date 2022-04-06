@@ -23,12 +23,17 @@ if (args.contentEquals(arrayOf("--test"))) {
 object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 	private val debug by option("--debug", help = "Enable debug logging").flag()
 	private val showTouches by option("--show-touches").flag("--hide-touches", default = true)
-	private val mirrorSerials by argument(name = "MIRROR_SERIAL")
+	private val deviceSerials by argument(name = "DEVICE_SERIALS")
 		.multiple(true)
 		.transformAll { it.toSet() }
 
 	override fun run() {
-		val mirrors = mirrorSerials.map(::createConnection)
+		if(deviceSerials.size < 2) {
+			throw Throwable("Please pass at least 2 device serials. For example, HostSerial MirrorSerial [AnotherMirrorSerial]...")
+		}
+		val host = deviceSerials.first()
+		val hostMapping = createDeviceEventMapping(host)
+		val mirrors = deviceSerials.minus(host).map(::createConnection)
 
 		println("ready!\n")
 
@@ -51,7 +56,7 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 					println("EVENT $input $type $code $value")
 				}
 				for (mirror in mirrors) {
-					mirror.sendEvent(input, type, code, value)
+					mirror.sendEvent(hostMapping[input] ?: input, type, code, value)
 				}
 			}
 
@@ -60,32 +65,24 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 		}
 	}
 
-	fun parseInputDevices(output: String): Map<Int, String> {
+	fun parseInputDevices(output: String): Map<String, String> {
 		fun isDeviceNumberLower(old: String, new: String): Boolean {
 			val oldNumber = old.substringAfter("/event").toInt()
 			val newNumber = new.substringAfter("/event").toInt()
 			return newNumber < oldNumber
 		}
 
-		val inputDevices = mutableMapOf<Int, String>()
+		val inputDevices = mutableMapOf<String, String>()
 		var lastInputDevice: String? = null
 		for (line in output.lines()) {
 			addDeviceLine.matchEntire(line)?.let { match ->
 				lastInputDevice = match.groupValues[1]
 			}
-			eventTypeLine.matchEntire(line)?.let { match ->
-				if (lastInputDevice!!.endsWith("/event0")) {
-					// Ignore 'event0' as a quick hack. TODO actually map event codes too.
-					return@let
-				}
-				val type = match.groupValues[1].toInt(16) // TODO is this actually hex here?
-				val previous = inputDevices[type]
-				if (previous == null || isDeviceNumberLower(previous, lastInputDevice!!)) {
-					inputDevices[type] = lastInputDevice!!
-				}
+			nameLine.matchEntire(line)?.let { match ->
+				val name = match.groupValues[1].split("\"")[1] // Ignoring the " at the start and end
+				inputDevices.put(lastInputDevice!!, name)
 			}
 		}
-
 		return inputDevices
 	}
 
@@ -94,7 +91,7 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 		fun detach()
 	}
 
-	private fun createConnection(serial: String): DeviceConnection {
+	private fun createDeviceEventMapping(serial: String): Map<String, String> {
 		val inputDevicesOutput = ProcessBuilder()
 			.command("adb", "-s", serial, "shell", "getevent -pl")
 			.start()
@@ -105,6 +102,11 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 		if (debug) {
 			println("[$serial] devices: $inputDevices")
 		}
+		return inputDevices
+	}
+
+	private fun createConnection(serial: String): DeviceConnection {
+		val inputDevices = createDeviceEventMapping(serial)
 
 		val showTouchesOriginalValue = ProcessBuilder()
 			.command("adb", "-s", serial, "shell", "settings get system show_touches")
@@ -153,7 +155,7 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 
 			override fun sendEvent(hostInputDevice: String, type: Int, code: Long, value: Long) {
 				val inputDevice = hostInputToSelfInput.computeIfAbsent(hostInputDevice) {
-					val result = inputDevices.getValue(type)
+					val result = inputDevices.filter { it.value == hostInputDevice }.keys.first()
 					if (debug) {
 						println("[$serial] $result will be used for host $it")
 					}
@@ -171,7 +173,7 @@ object AdbEventMirrorCommand : CliktCommand(name = "adb-event-mirror") {
 	}
 
 	private val addDeviceLine = Regex("""add device \d+: (.+)""")
-	private val eventTypeLine = Regex("""    [A-Z]+ \((\d+)\): .*""")
+	private val nameLine = Regex(""" *name:(.+)""")
 	private val eventLine = Regex("""(/dev/input/[^:]+): ([0-9a-f]+) ([0-9a-f]+) ([0-9a-f]+)""")
 }
 
