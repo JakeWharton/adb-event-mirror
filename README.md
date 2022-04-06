@@ -16,7 +16,7 @@ List of devices attached
 emulator-5554	device
 emulator-5556	device
 
-$ adb -s emulator-5554 shell getevent | /path/to/adb-event-mirror.main.kts emulator-5556
+$ adb -s emulator-5554 shell getevent | /path/to/adb-event-mirror.main.kts emulator-5554 emulator-5556
 ready!
 
 EVENT /dev/input/event1 3 57 0
